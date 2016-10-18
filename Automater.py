@@ -9,22 +9,18 @@ Hash to query each separated by a newline.
 
 Optional Parameters are:
 -o, --output -- This option will output the results to a file.
--b, --bot -- This option will output minimized results for a bot.
 -f, --cef -- This option will output the results to a CEF formatted file.
 -w, --web -- This option will output the results to an HTML file.
 -c, --csv -- This option will output the results to a CSV file.
 -d, --delay -- Change the delay to the inputted seconds. Default is 2.
 -s, --source -- Will only run the target against a specific source engine
-to pull associated domains. Options are defined in the name attribute of
-the site element in the XML configuration file. This can be a list of names separated by a semicolon.
+to pull associated domains.  Options are defined in the name attribute of
+the site element in the XML configuration file
+--p --post -- Tells the program to post information to sites that allow posting.
+By default the program will NOT post to sites that require a post.
 --proxy -- This option will set a proxy (eg. proxy.example.com:8080)
 -a --useragent -- Will set a user-agent string in the header of a web request.
 is set by default to Automater/version#
--V, --vercheck -- This option checks and reports versioning for Automater. Checks each python
-module in the Automater scope.  Default, (no -V) is False
--r, --refreshxml -- This option refreshes the tekdefense.xml file from the remote GitHub site.
-Default (no -r) is False.
--v, --verbose -- This option prints messages to the screen. Default (no -v) is False.
 
 Class(es):
 No classes are defined in this module.
@@ -37,14 +33,10 @@ No exceptions exported.
 """
 
 import sys
-from siteinfo import SiteFacade, Site
+from siteinfo import SiteFacade
 from utilities import Parser, IPWrapper
 from outputs import SiteDetailOutput
 from inputs import TargetFile
-
-__VERSION__ = '0.21'
-__GITLOCATION__ = 'https://github.com/1aN0rmus/TekDefense-Automater'
-__GITFILEPREFIX__ = 'https://raw.githubusercontent.com/1aN0rmus/TekDefense-Automater/master/'
 
 def main():
     """
@@ -59,9 +51,8 @@ def main():
     Restriction(s):
     The Method has no restrictions.
     """
-
     sites = []
-    parser = Parser('IP, URL, and Hash Passive Analysis tool', __VERSION__)
+    parser = Parser('IP, URL, and Hash Passive Analysis tool')
 
     # if no target run and print help
     if parser.hasNoTarget():
@@ -69,40 +60,35 @@ def main():
         parser.print_help()  # need to fix this. Will later
         sys.exit()
 
-    if parser.VersionCheck:
-        Site.checkmoduleversion(__GITFILEPREFIX__, __GITLOCATION__, parser.Proxy, parser.Verbose)
-
     # user may only want to run against one source - allsources
     # is the seed used to check if the user did not enter an s tag
-    sourcelist = ['allsources']
+    source = "allsources"
     if parser.hasSource():
-        sourcelist = parser.Source.split(';')
+        source = parser.Source
 
     # a file input capability provides a possibility of
     # multiple lines of targets
     targetlist = []
     if parser.hasInputFile():
-        for tgtstr in TargetFile.TargetList(parser.InputFile, parser.Verbose):
-            tgtstrstripped = tgtstr.replace('[.]', '.').replace('{.}', '.').replace('(.)', '.')
-            if IPWrapper.isIPorIPList(tgtstrstripped):
-                for targ in IPWrapper.getTarget(tgtstrstripped):
+        for tgtstr in TargetFile.TargetList(parser.InputFile):
+            if IPWrapper.isIPorIPList(tgtstr):
+                for targ in IPWrapper.getTarget(tgtstr):
                     targetlist.append(targ)
             else:
-                targetlist.append(tgtstrstripped)
+                targetlist.append(tgtstr)
     else:  # one target or list of range of targets added on console
         target = parser.Target
-        tgtstrstripped = target.replace('[.]', '.').replace('{.}', '.').replace('(.)', '.')
-        if IPWrapper.isIPorIPList(tgtstrstripped):
-            for targ in IPWrapper.getTarget(tgtstrstripped):
+        if IPWrapper.isIPorIPList(target):
+            for targ in IPWrapper.getTarget(target):
                 targetlist.append(targ)
         else:
-            targetlist.append(tgtstrstripped)
+            targetlist.append(target)
 
-    sitefac = SiteFacade(parser.Verbose)
-    sitefac.runSiteAutomation(parser.Delay, parser.Proxy, targetlist, sourcelist, parser.UserAgent, parser.hasBotOut,
-                              parser.RefreshRemoteXML, __GITLOCATION__)
+    sitefac = SiteFacade()
+    sitefac.runSiteAutomation(parser.Delay, parser.Proxy, targetlist, \
+                              source, parser.hasPost(), parser.UserAgent)
     sites = sitefac.Sites
-    if sites:
+    if sites is not None:
         SiteDetailOutput(sites).createOutputInfo(parser)
 
 if __name__ == "__main__":
